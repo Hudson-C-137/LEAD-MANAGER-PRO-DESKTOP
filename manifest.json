@@ -1,0 +1,25 @@
+{
+  "short_name": "Ex-Car",
+  "name": "Lead Manager Pro - Ex-Car Edition",
+  "description": "Sistema de gestão de leads e vendas Ex-Car",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#8ECAE6",
+  "display": "standalone",
+  "scope": "./",
+  "theme_color": "#219EBC",
+  "orientation": "portrait-primary"
+}

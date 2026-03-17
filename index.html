@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Ex-Car Lead">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="theme-color" content="#219EBC">
+    <meta name="mobile-web-app-capable" content="yes">
+    
+    <title>Lead Manager Pro - Ex-Car Edition</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+    
+    <style>
+        :root {
+            --mac-bg: rgba(255, 255, 255, 0.9);
+            --mac-border: rgba(200, 200, 200, 0.4);
+            --mac-accent: #007AFF;
+            --mac-text: #1d1d1f;
+            --mac-red: #FF3B30;
+            --mac-green: #34C759;
+            --mac-orange: #FF9500;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #8ECAE6, #219EBC);
+            height: 100vh; margin: 0; display: flex; color: var(--mac-text);
+            overflow: hidden; -webkit-font-smoothing: antialiased;
+        }
+
+        .main-content { 
+            flex: 1;
+            padding: 80px 20px 40px; 
+            overflow-y: auto; 
+            -webkit-overflow-scrolling: touch;
+        }
+
+        #sidebar {
+            width: 300px;
+            background: var(--mac-bg); backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px); border-left: 1px solid var(--mac-border);
+            padding: 25px 25px 60px 25px;
+            transform: translate3d(100%, 0, 0);
+            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+            position: fixed; right: 0; height: 100%; z-index: 1000;
+            display: flex; flex-direction: column;
+            overflow-y: auto;
+            box-shadow: -10px 0 30px rgba(0,0,0,0.1);
+            box-sizing: border-box;
+        }
+        #sidebar.active { transform: translate3d(0, 0, 0); }
+
+        .toggle-btn {
+            position: fixed;
+            top: 20px; right: 20px; z-index: 1001;
+            background: var(--mac-bg); backdrop-filter: blur(10px);
+            border: 1px solid var(--mac-border); border-radius: 12px;
+            width: 50px; height: 50px;
+            cursor: pointer;
+            display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 5px;
+        }
+        .toggle-btn span { width: 25px; height: 3px; background: var(--mac-text); border-radius: 2px; }
+
+        .top-date {
+            position: absolute;
+            top: 20px; left: 50%; transform: translateX(-50%);
+            text-align: center; color: white; text-shadow: 0 2px 4px rgba(0,0,0,0.2); width: 100%;
+        }
+
+        .card {
+            background: var(--mac-bg);
+            backdrop-filter: blur(15px); border-radius: 18px;
+            border: 1px solid var(--mac-border); padding: 20px; margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .stats-grid { 
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); 
+            gap: 15px; max-width: 1200px; margin: 0 auto 20px;
+        }
+
+        button { 
+            background: var(--mac-accent);
+            color: white; border: none; padding: 14px; 
+            border-radius: 12px; cursor: pointer; font-weight: 600; font-size: 15px;
+            transition: transform 0.1s;
+        }
+        button:active { transform: scale(0.96); }
+        
+        input, select { 
+            padding: 14px;
+            border-radius: 10px; border: 1px solid var(--mac-border); 
+            background: white; width: 100%; margin-bottom: 12px; font-size: 16px;
+            box-sizing: border-box;
+        }
+
+        #report-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); backdrop-filter: blur(8px);
+            z-index: 2000; display: none; align-items: center; justify-content: center;
+        }
+        .modal-content {
+            background: white;
+            width: 90%; max-width: 450px; border-radius: 24px; padding: 25px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.3); max-height: 90vh; overflow-y: auto;
+        }
+
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-top: 15px; }
+        .calendar-day { padding: 12px 5px; text-align: center; border-radius: 10px; cursor: pointer; font-size: 13px; }
+        .calendar-day.selected { background: var(--mac-accent) !important; color: white; font-weight: bold; }
+        .calendar-day.header { font-weight: bold; color: #86868b; cursor: default; }
+
+        .consultant-item {
+            display: flex;
+            justify-content: space-between; align-items: center;
+            background: rgba(0,0,0,0.04); padding: 10px 12px; border-radius: 12px; margin-bottom: 8px;
+        }
+        .btn-del-mini { background: var(--mac-red); padding: 6px 10px; font-size: 12px; border-radius: 8px; }
+
+        .table-responsive { overflow-x: auto; width: 100%; border-radius: 12px; }
+        table { width: 100%; border-collapse: collapse; background: white; min-width: 700px; }
+        th { background: #f5f5f7; padding: 12px; text-align: left; font-size: 12px; color: #86868b; }
+        td { padding: 14px 12px; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+        
+        .action-btns { display: flex; gap: 5px; }
+        .btn-edit { background: var(--mac-orange); padding: 5px 8px; font-size: 11px; }
+        .btn-delete { background: var(--mac-red); padding: 5px 8px; font-size: 11px; }
+
+        .progress-wrapper { background: #e5e5ea; border-radius: 12px; height: 28px; position: relative; overflow: hidden; margin: 10px 0; }
+        .progress-bar { height: 100%; background: var(--mac-accent); transition: width 0.6s ease; }
+        .progress-text { position: absolute; width: 100%; text-align: center; top: 4px; font-weight: bold; font-size: 14px; }
+
+        .forms-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="top-date">
+        <div id="date-day" style="font-size: 1.2rem; font-weight: 700;">...</div>
+        <div id="date-full" style="font-size: 0.9rem; opacity: 0.9;">...</div>
+    </div>
+
+    <button class="toggle-btn" onclick="toggleSidebar()"><span></span><span></span><span></span></button>
+
+    <div id="sidebar">
+        <h2 style="text-align: center; margin-bottom: 30px;">Painel Ex-Car</h2>
+        
+        <button onclick="openReportModal()" style="background: var(--mac-green); margin-bottom: 25px;">📊 Relatórios em PDF</button>
+        
+        <div style="border-top: 1px solid var(--mac-border); padding-top: 20px;">
+            <h4 style="margin-bottom: 12px;">Gerenciar Consultores</h4>
+            <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+                <input type="text" id="new-consultant-name" placeholder="Nome..." style="margin-bottom:0">
+                <button onclick="addConsultant()" style="padding: 0 15px;">+</button>
+            </div>
+            <div id="consultants-list" style="max-height: 200px; overflow-y: auto;"></div>
+        </div>
+
+        <div style="margin-top: 30px; border-top: 1px solid var(--mac-border); padding-top: 20px;">
+            <h4 style="margin-bottom: 12px;">Backup de Dados</h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <button onclick="exportBackup()" style="background: #636366; font-size: 12px;">Exportar</button>
+                <button onclick="document.getElementById('import-file').click()" style="background: #636366; font-size: 12px;">Importar</button>
+                <input type="file" id="import-file" style="display:none" accept=".json" onchange="importBackup(this)">
+            </div>
+        </div>
+
+        <div style="margin-top: 40px; padding-bottom: 20px;">
+            <button onclick="fullReset()" style="background: var(--mac-red); width: 100%;">⚠️ Apagar Tudo (Reset)</button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="stats-grid">
+            <div class="card" style="text-align:center"><h4>Hoje</h4><h2 id="leads-today">0</h2></div>
+            <div class="card" style="text-align:center"><h4>Semana</h4><h2 id="leads-week">0</h2></div>
+            <div class="card" style="text-align:center"><h4>Mês</h4><h2 id="leads-month">0</h2></div>
+        </div>
+
+        <div class="forms-container">
+            <div class="card">
+                <h3>Novo Registro (Entrada)</h3>
+                <label style="font-size:11px; font-weight:bold; color:#666">WhatsApp / Telefone (+55...)</label>
+                <input type="text" id="input-phone" placeholder="+5511999999999" oninput="autoDetectDDD(this.value)">
+                
+                <label style="font-size:11px; font-weight:bold; color:#666">Consultor</label>
+                <select id="select-consultant"></select>
+                
+                <label style="font-size:11px; font-weight:bold; color:#666">Data</label>
+                <input type="date" id="input-date">
+                
+                <label style="font-size:11px; font-weight:bold; color:#666">Região (DDD)</label>
+                <select id="select-ddd"></select>
+                
+                <label style="font-size:11px; font-weight:bold; color:#666">Quantidade</label>
+                <input type="number" id="input-qtd" placeholder="Qtd de leads">
+                
+                <button onclick="addLead()" style="width: 100%;">Salvar Entrada</button>
+            </div>
+
+            <div class="card" style="border: 1px solid var(--mac-green);">
+                <h3 style="color: var(--mac-green);">Venda (Lead Verde)</h3>
+                <label style="font-size:11px; font-weight:bold; color:#666">Consultor</label>
+                <select id="select-green-consultant"></select>
+                <label style="font-size:11px; font-weight:bold; color:#666">Data da Venda</label>
+                <input type="date" id="input-green-date">
+                <label style="font-size:11px; font-weight:bold; color:#666">Região (DDD)</label>
+                <select id="select-green-ddd"></select>
+                <label style="font-size:11px; font-weight:bold; color:#666">Qtd Vendida</label>
+                <input type="number" id="input-green-qtd" placeholder="Qtd vendida">
+                <button onclick="addGreenLead()" style="width: 100%; background: var(--mac-green);">Salvar Venda</button>
+            </div>
+        </div>
+
+        <div class="card" style="max-width: 1200px; margin: 20px auto;">
+            <h3>Metas Mensais</h3>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <select id="goal-month-selector" onchange="updateUI()"></select>
+                <input type="number" id="goal-target" style="width: 120px; margin-bottom: 0" onchange="saveGoal()" placeholder="Meta">
+            </div>
+            <div class="progress-wrapper">
+                <div class="progress-bar" id="goal-progress-bar"></div>
+                <div class="progress-text" id="goal-progress-text">0/0</div>
+            </div>
+            <p id="goal-msg" style="text-align: center; font-weight: bold; margin: 0;"></p>
+        </div>
+
+        <div class="card" style="max-width: 1200px; margin: 20px auto;">
+            <h3>Histórico de Registros</h3>
+            <div class="table-responsive">
+                <table id="main-table">
+                    <thead>
+                        <tr>
+                            <th>Data e Hora</th>
+                            <th>Tipo</th>
+                            <th>DDD</th>
+                            <th>Telefone</th>
+                            <th>Qtd</th>
+                            <th>Consultor</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="report-modal">
+        <div class="modal-content">
+            <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom:15px">
+                <h3 style="margin:0">Relatório Personalizado</h3>
+                <button onclick="closeReportModal()" style="background:none; color:black; font-size:24px; padding:0; border:none; cursor:pointer">×</button>
+            </div>
+            
+            <label style="font-size:12px; font-weight:bold">Filtrar por Consultor</label>
+            <select id="report-consultant-filter"></select>
+
+            <div style="display: flex; justify-content: space-between; align-items:center; margin: 15px 0">
+                <button onclick="changeMonth(-1)" style="padding: 5px 15px">◀</button>
+                <span id="calendar-title" style="font-weight:bold"></span>
+                <button onclick="changeMonth(1)" style="padding: 5px 15px">▶</button>
+            </div>
+
+            <div class="calendar-grid" id="calendar-days"></div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px;">
+                <button onclick="setMode('day')" id="m-day">Dia</button>
+                <button onclick="setMode('week')" id="m-week">Semana</button>
+                <button onclick="setMode('month')" id="m-month">Mês</button>
+                <button onclick="setMode('range')" id="m-range">Período</button>
+            </div>
+
+            <button onclick="generatePDF()" style="width:100%; background: var(--mac-green); margin-top: 20px;">🚀 Gerar Documento PDF</button>
+        </div>
+    </div>
+
+    <script>
+        // REGISTRO PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
+            });
+        }
+
+        let db = {
+            leads: JSON.parse(localStorage.getItem('leads_db')) || [],
+            verdes: JSON.parse(localStorage.getItem('verdes_db')) || [],
+            consultores: JSON.parse(localStorage.getItem('consultores_db')) || [],
+            metas: JSON.parse(localStorage.getItem('metas_db')) || {}
+        };
+
+        let currentCal = new Date();
+        let selectedDates = [];
+        let filterMode = 'day';
+        let rangeStart = null;
+
+        window.onload = () => {
+            initSelects();
+            renderConsultants();
+            updateUI();
+            document.querySelectorAll('input[type="date"]').forEach(i => i.valueAsDate = new Date());
+            updateClock();
+            setInterval(updateClock, 60000);
+        };
+
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); }
+        function openReportModal() { document.getElementById('report-modal').style.display = 'flex'; renderCalendar(); }
+        function closeReportModal() { document.getElementById('report-modal').style.display = 'none'; }
+
+        function initSelects() {
+            const ddds = [11,12,13,14,15,16,17,18,19,21,22,24,27,28,31,32,33,34,35,37,38,41,42,43,44,45,46,47,48,49,51,53,54,55,61,62,63,64,65,66,67,68,69,71,73,74,75,77,79,81,82,83,84,85,86,87,88,89,91,92,93,94,95,96,97,98,99];
+            const s1 = document.getElementById('select-ddd');
+            const s2 = document.getElementById('select-green-ddd');
+            ddds.forEach(d => {
+                s1.add(new Option(`DDD ${d}`, d));
+                s2.add(new Option(`DDD ${d}`, d));
+            });
+            const months = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+            const mSel = document.getElementById('goal-month-selector');
+            const now = new Date();
+            months.forEach((m, i) => {
+                const val = `${now.getFullYear()}-${String(i+1).padStart(2,'0')}`;
+                mSel.add(new Option(m, val));
+            });
+            mSel.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+        }
+
+        function autoDetectDDD(val) {
+            let clean = val.replace(/\D/g, '');
+            if (clean.startsWith('55')) {
+                let ddd = clean.substring(2, 4);
+                if (ddd.length === 2) document.getElementById('select-ddd').value = ddd;
+            } else if (clean.length >= 2) {
+                let ddd = clean.substring(0, 2);
+                document.getElementById('select-ddd').value = ddd;
+            }
+        }
+
+        function addConsultant() {
+            const name = document.getElementById('new-consultant-name').value.trim();
+            if(!name) return;
+            if(!db.consultores.includes(name)) {
+                db.consultores.push(name);
+                saveDB();
+                renderConsultants();
+                document.getElementById('new-consultant-name').value = '';
+            }
+        }
+
+        function removeConsultant(name) {
+            if(confirm(`Tem certeza que deseja apagar o consultor "${name}"?`)) {
+                const pass = prompt("Senha ADM para confirmar exclusão:");
+                if(pass === 'Hudson@2026') {
+                    db.consultores = db.consultores.filter(c => c !== name);
+                    saveDB();
+                    renderConsultants();
+                } else alert("Senha incorreta!");
+            }
+        }
+
+        function renderConsultants() {
+            const list = document.getElementById('consultants-list');
+            const s1 = document.getElementById('select-consultant');
+            const s2 = document.getElementById('select-green-consultant');
+            const s3 = document.getElementById('report-consultant-filter');
+            list.innerHTML = '';
+            s1.innerHTML = '<option value="">Selecionar...</option>';
+            s2.innerHTML = '<option value="">Selecionar...</option>';
+            s3.innerHTML = '<option value="all">Todos os Consultores</option>';
+            db.consultores.sort().forEach(c => {
+                list.innerHTML += `<div class="consultant-item"><span>${c}</span><button class="btn-del-mini" onclick="removeConsultant('${c}')">Apagar</button></div>`;
+                s1.add(new Option(c, c));
+                s2.add(new Option(c, c));
+                s3.add(new Option(c, c));
+            });
+        }
+
+        function getTimestampWithCurrentTime(dateInputId) {
+            const dateVal = document.getElementById(dateInputId).value;
+            const now = new Date();
+            const [y, m, d] = dateVal.split('-');
+            return new Date(y, m-1, d, now.getHours(), now.getMinutes(), now.getSeconds()).toISOString();
+        }
+
+        function addLead() {
+            const consultor = document.getElementById('select-consultant').value;
+            const qtd = parseInt(document.getElementById('input-qtd').value);
+            const phone = document.getElementById('input-phone').value.trim();
+            
+            if(!consultor || !qtd) return alert("Selecione o consultor e a quantidade!");
+            if (phone !== '' && phone !== '-') {
+                const duplicated = db.leads.find(l => l.phone === phone);
+                if (duplicated) {
+                    const confirmAdd = confirm(`O telefone ${phone} já está cadastrado no histórico (Consultor: ${duplicated.consultor}). Deseja adicionar novamente mesmo assim?`);
+                    if (!confirmAdd) return;
+                }
+            }
+            
+            db.leads.push({
+                id: Date.now(),
+                consultor,
+                ddd: document.getElementById('select-ddd').value,
+                phone: phone || '-',
+                qtd,
+                timestamp: getTimestampWithCurrentTime('input-date'),
+                type: 'Entrada'
+            });
+            saveDB(); updateUI(); 
+            document.getElementById('input-qtd').value = '';
+            document.getElementById('input-phone').value = '';
+        }
+
+        function addGreenLead() {
+            const consultor = document.getElementById('select-green-consultant').value;
+            const qtd = parseInt(document.getElementById('input-green-qtd').value);
+            if(!consultor || !qtd) return alert("Selecione o consultor e a quantidade!");
+            db.verdes.push({
+                id: Date.now(),
+                consultor,
+                ddd: document.getElementById('select-green-ddd').value,
+                phone: '-',
+                qtd,
+                timestamp: getTimestampWithCurrentTime('input-green-date'),
+                type: 'Verde'
+            });
+            saveDB(); updateUI(); document.getElementById('input-green-qtd').value = '';
+        }
+
+        function deleteRecord(id, type) {
+            const pass = prompt("Para apagar um registro, digite a senha ADM:");
+            if (pass === 'Hudson@2026') {
+                if (type === 'Entrada') db.leads = db.leads.filter(l => l.id !== id);
+                else db.verdes = db.verdes.filter(v => v.id !== id);
+                saveDB(); updateUI();
+            } else alert("Senha incorreta!");
+        }
+
+        function editRecord(id, type) {
+            let record = type === 'Entrada' ? db.leads.find(l => l.id === id) : db.verdes.find(v => v.id === id);
+            if (!record) return;
+            let newQtd = prompt("Nova Quantidade:", record.qtd);
+            if (newQtd === null) return;
+            record.qtd = parseInt(newQtd);
+            if (type === 'Entrada') {
+                let newPhone = prompt("Novo Telefone:", record.phone);
+                if (newPhone !== null) record.phone = newPhone;
+            }
+            saveDB();
+            updateUI();
+        }
+
+        function saveGoal() {
+            const key = document.getElementById('goal-month-selector').value;
+            db.metas[key] = parseInt(document.getElementById('goal-target').value);
+            saveDB(); updateUI();
+        }
+
+        function saveDB() {
+            localStorage.setItem('leads_db', JSON.stringify(db.leads));
+            localStorage.setItem('verdes_db', JSON.stringify(db.verdes));
+            localStorage.setItem('consultores_db', JSON.stringify(db.consultores));
+            localStorage.setItem('metas_db', JSON.stringify(db.metas));
+        }
+
+        function updateUI() {
+            const now = new Date();
+            const todayStr = now.toISOString().split('T')[0];
+            const goalMonth = document.getElementById('goal-month-selector').value;
+            let t=0, w=0, m=0, vM=0;
+            db.leads.forEach(l => {
+                const lDate = l.timestamp.split('T')[0];
+                if(lDate === todayStr) t += l.qtd;
+                if((now - new Date(l.timestamp)) < 7*24*60*60*1000) w += l.qtd;
+                if(l.timestamp.startsWith(goalMonth)) m += l.qtd;
+            });
+            db.verdes.forEach(v => { if(v.timestamp.startsWith(goalMonth)) vM += v.qtd; });
+
+            document.getElementById('leads-today').innerText = t;
+            document.getElementById('leads-week').innerText = w;
+            document.getElementById('leads-month').innerText = m;
+            const target = db.metas[goalMonth] || 100;
+            const pct = Math.min(100, Math.round((vM / target) * 100));
+            document.getElementById('goal-progress-bar').style.width = pct + '%';
+            document.getElementById('goal-progress-text').innerText = `${vM} / ${target} (${pct}%)`;
+            
+            const combined = [...db.leads, ...db.verdes].sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+            document.querySelector('#main-table tbody').innerHTML = combined.slice(0, 25).map(l => {
+                const dt = new Date(l.timestamp);
+                const formatData = dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+                return `
+                <tr style="${l.type === 'Verde' ? 'color: var(--mac-green); font-weight:bold' : ''}">
+                    <td>${formatData}</td>
+                    <td>${l.type}</td>
+                    <td>${l.ddd}</td>
+                    <td>${l.phone || '-'}</td>
+                    <td>${l.qtd}</td>
+                    <td>${l.consultor}</td>
+                    <td>
+                        <div class="action-btns">
+                            <button class="btn-edit" onclick="editRecord(${l.id}, '${l.type}')">E</button>
+                            <button class="btn-delete" onclick="deleteRecord(${l.id}, '${l.type}')">X</button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        function renderCalendar() {
+            const grid = document.getElementById('calendar-days');
+            grid.innerHTML = '';
+            ['D','S','T','Q','Q','S','S'].forEach(d => grid.innerHTML += `<div class="calendar-day header">${d}</div>`);
+            const y = currentCal.getFullYear(), m = currentCal.getMonth();
+            document.getElementById('calendar-title').innerText = `${m+1} / ${y}`;
+            const first = new Date(y, m, 1).getDay();
+            const last = new Date(y, m + 1, 0).getDate();
+            for(let i=0; i<first; i++) grid.innerHTML += '<div></div>';
+            for(let d=1; d<=last; d++) {
+                const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const div = document.createElement('div');
+                div.className = 'calendar-day' + (selectedDates.includes(dateStr) ? ' selected' : '');
+                div.innerText = d;
+                div.onclick = () => handleDate(dateStr);
+                grid.appendChild(div);
+            }
+        }
+
+        function handleDate(str) {
+            const dt = new Date(str + 'T12:00:00');
+            if(filterMode === 'day') selectedDates = [str];
+            else if(filterMode === 'week') {
+                selectedDates = [];
+                const start = new Date(dt); start.setDate(dt.getDate() - dt.getDay());
+                for(let i=0; i<7; i++) {
+                    const temp = new Date(start);
+                    temp.setDate(start.getDate() + i);
+                    selectedDates.push(temp.toISOString().split('T')[0]);
+                }
+            } else if(filterMode === 'month') {
+                selectedDates = [];
+                const last = new Date(dt.getFullYear(), dt.getMonth()+1, 0).getDate();
+                for(let i=1; i<=last; i++) selectedDates.push(`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`);
+            } else if(filterMode === 'range') {
+                if(!rangeStart || selectedDates.length > 1) { rangeStart = dt; selectedDates = [str]; }
+                else {
+                    selectedDates = [];
+                    const d1 = rangeStart < dt ? rangeStart : dt;
+                    const d2 = rangeStart < dt ? dt : rangeStart;
+                    let temp = new Date(d1);
+                    while(temp <= d2) { selectedDates.push(temp.toISOString().split('T')[0]); temp.setDate(temp.getDate()+1); }
+                    rangeStart = null;
+                }
+            }
+            renderCalendar();
+        }
+
+        function setMode(m) {
+            filterMode = m;
+            selectedDates = []; rangeStart = null;
+            document.querySelectorAll('[id^="m-"]').forEach(b => b.style.background = '#007AFF');
+            document.getElementById('m-'+m).style.background = '#0056b3';
+            renderCalendar();
+        }
+
+        function changeMonth(v) { currentCal.setMonth(currentCal.getMonth()+v); renderCalendar(); }
+
+        function generatePDF() {
+            if (selectedDates.length === 0) return alert("Escolha o período no calendário!");
+
+            const filterC = document.getElementById('report-consultant-filter').value;
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Gerar data do cabeçalho
+            const now = new Date();
+            const dateStrHeader = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear()).substring(2)}`;
+            
+            // Cabeçalho Principal
+            doc.setFontSize(16);
+            doc.setFont(undefined, 'bold');
+            doc.text(`EX-CAR - RELATÓRIO DE LEADS - ${dateStrHeader}`, 14, 18);
+            
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'normal');
+            doc.text(`Período selecionado: ${selectedDates[0]} até ${selectedDates[selectedDates.length - 1]}`, 14, 25);
+
+            // Filtrar todos os dados do período
+            const allData = [...db.leads, ...db.verdes].filter(item => {
+                const itemDate = item.timestamp.split('T')[0];
+                return selectedDates.includes(itemDate);
+            });
+
+            // Definir quais consultores processar
+            const consultantsToProcess = filterC === 'all' 
+                ? [...new Set(allData.map(item => item.consultor))].sort() 
+                : [filterC];
+
+            let currentY = 35;
+
+            consultantsToProcess.forEach((cons) => {
+                const consData = allData.filter(d => d.consultor === cons)
+                                       .sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+                
+                if (consData.length === 0) return;
+
+                // Verificar espaço na página
+                if (currentY > 240) { doc.addPage(); currentY = 20; }
+
+                // Subtítulo do Consultor
+                doc.setFontSize(12);
+                doc.setFont(undefined, 'bold');
+                doc.text(`Consultor: ${cons}`, 14, currentY);
+                currentY += 6;
+
+                // Tabela do Consultor
+                const tableRows = consData.map(l => {
+                    const dt = new Date(l.timestamp);
+                    const dateFormatted = dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+                    return [dateFormatted, l.type, l.ddd, l.phone || '-', l.qtd];
+                });
+
+                doc.autoTable({
+                    head: [['Data e Hora', 'Tipo', 'DDD', 'Telefone', 'Qtd']],
+                    body: tableRows,
+                    startY: currentY,
+                    theme: 'striped',
+                    headStyles: { fillColor: [33, 158, 188] },
+                    styles: { fontSize: 9 },
+                    margin: { left: 14 },
+                    didDrawPage: (data) => { currentY = data.cursor.y; }
+                });
+
+                // Totalizador do Consultor
+                currentY += 8;
+                const totalConsultor = consData.reduce((acc, curr) => acc + curr.qtd, 0);
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'bold');
+                doc.text(`TOTAL DE LEADS (${cons}): ${totalConsultor}`, 14, currentY);
+                currentY += 15; // Espaço para o próximo consultor
+            });
+
+            const fileName = `Relatorio_ExCar_${dateStrHeader.replace(/\//g, '-')}.pdf`;
+            doc.save(fileName);
+        }
+
+        function exportBackup() {
+            const blob = new Blob([JSON.stringify(db)], {type: "application/json"});
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+            a.download = `backup_excar_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+        }
+
+        function importBackup(input) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    db = { ...db, ...imported };
+                    saveDB(); renderConsultants(); updateUI(); alert("Backup Importado!");
+                } catch(err) { alert("Arquivo inválido."); }
+            };
+            reader.readAsText(input.files[0]);
+        }
+
+        function fullReset() {
+            const pass = prompt("Senha ADM para RESET TOTAL:");
+            if(pass === 'Hudson@2026') { localStorage.clear(); location.reload(); }
+            else alert("Senha Incorreta!");
+        }
+
+        function updateClock() {
+            const now = new Date();
+            const days = ['DOMINGO', 'SEGUNDA-FEIRA', 'TERÇA-FEIRA', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SEXTA-FEIRA', 'SÁBADO'];
+            document.getElementById('date-day').innerText = days[now.getDay()];
+            document.getElementById('date-full').innerText = now.toLocaleDateString('pt-BR', {day: 'numeric', month: 'long', year: 'numeric'});
+        }
+    </script>
+</body>
+</html>
